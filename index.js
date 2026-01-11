@@ -21,9 +21,7 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildPresences
+    GatewayIntentBits.MessageContent
   ]
 });
 
@@ -94,7 +92,10 @@ client.on('messageCreate', async message => {
       .setTitle('Hounds.lol | Changelog Panel')
       .setDescription('Kliknij przycisk, aby dodać changelog.');
 
-    return message.channel.send({ embeds: [embed], components: [row] });
+    await message.channel.send({ embeds: [embed], components: [row] });
+
+    // USUWA KOMENDĘ
+    setTimeout(() => message.delete(), 2000);
   }
 });
 
@@ -136,7 +137,7 @@ Opisz swój problem.`,
     return interaction.reply({ content: '✅ Ticket utworzony!', ephemeral: true });
   }
 
-  // ZAMYKANIE + TRANSKRYPT
+  // ZAMYKANIE TICKETU
   if (interaction.isButton() && interaction.customId === 'close_ticket') {
     const channel = interaction.channel;
     const logChannel = interaction.guild.channels.cache.find(c => c.name === 'ticket-logs');
@@ -161,7 +162,7 @@ Opisz swój problem.`,
   }
 
   // OTWARCIE FORMULARZA CHANGELOG
-  if (interaction.customId === 'open_changelog_form') {
+  if (interaction.isButton() && interaction.customId === 'open_changelog_form') {
     const modal = new ModalBuilder()
       .setCustomId('changelog_modal')
       .setTitle('Hounds.lol Changelog');
@@ -217,11 +218,24 @@ ${removed ? `🔴 **Usunięto:**\n${removed}\n` : ''}
       .setTimestamp();
 
     const channel = interaction.guild.channels.cache.find(c => c.name === 'changelog');
-    if (channel) channel.send({ embeds: [embed] });
+
+    if (channel) {
+      await channel.send({
+        content: '@everyone',
+        embeds: [embed]
+      });
+    }
 
     await interaction.reply({ content: '✅ Changelog wysłany!', ephemeral: true });
+
+    // USUWA PANEL Z PRZYCISKIEM
+    try {
+      await interaction.message?.delete();
+    } catch {}
   }
 });
 
-// TOKEN (Z RAILWAY / REPLIT / .env)
+// TOKEN (UŻYJ ENV LUB WPISZ NA SZTYWNO)
 client.login(process.env.TOKEN);
+// LUB:
+// client.login("TWÓJ_DISCORD_TOKEN");
