@@ -21,7 +21,9 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildPresences
   ]
 });
 
@@ -210,7 +212,7 @@ ${added ? `🟢 **Dodano:**\n${added}\n` : ''}
 ${fixed ? `🟠 **Naprawiono:**\n${fixed}\n` : ''}
 ${removed ? `🔴 **Usunięto:**\n${removed}\n` : ''}
 `)
-      .setImage('https://cdn.discordapp.com/attachments/1315741454437584916/1460033159755468842/3828650c-0ca4-430c-b033-9ab469eeb873-md.jpg?ex=69657157&is=69641fd7&hm=4e00e8ac0075f913e1f8746abec3bae250e65b3193f41cdbe05df46f260165e9&')
+      .setImage('https://cdn.discordapp.com/attachments/1315741454437584916/1460033159755468842/3828650c-0ca4-430c-b033-9ab469eeb873-md.jpg')
       .setFooter({ text: 'Hounds.lol • Stay Secure' })
       .setTimestamp();
 
@@ -221,5 +223,5 @@ ${removed ? `🔴 **Usunięto:**\n${removed}\n` : ''}
   }
 });
 
-// TOKEN
+// TOKEN (Z RAILWAY / REPLIT / .env)
 client.login(process.env.TOKEN);
