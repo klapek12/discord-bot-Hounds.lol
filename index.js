@@ -93,11 +93,10 @@ client.on('messageCreate', async message => {
       .setDescription('Kliknij przycisk, aby dodać changelog.');
 
     await message.channel.send({ embeds: [embed], components: [row] });
-
     setTimeout(() => message.delete(), 2000);
   }
 
-  // =================== NEW TEXT PANEL ===================
+  // =================== TEXT PANEL ===================
   if (message.content === '!text') {
     const menu = new StringSelectMenuBuilder()
       .setCustomId('ping_select')
@@ -121,7 +120,107 @@ client.on('messageCreate', async message => {
 // =================== INTERACTIONS ===================
 client.on('interactionCreate', async interaction => {
 
-  // =================== PING SELECT ===================
+  // TICKET CREATE
+  if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_menu') {
+    const guild = interaction.guild;
+    const user = interaction.user;
+    const category = interaction.values[0];
+
+    const channel = await guild.channels.create({
+      name: `ticket-${user.username}`,
+      type: ChannelType.GuildText,
+      permissionOverwrites: [
+        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+        { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        { id: SUPPORT_ROLE_ID, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+      ]
+    });
+
+    const closeBtn = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('close_ticket')
+        .setLabel('🔒 Zamknij ticket')
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await channel.send({
+      content: `🎫 **Hounds.lol Ticket**  
+Kategoria: **${category}**  
+Użytkownik: ${user}
+
+Opisz swój problem.`,
+      components: [closeBtn]
+    });
+
+    return interaction.reply({ content: '✅ Ticket utworzony!', ephemeral: true });
+  }
+
+  // CLOSE TICKET
+  if (interaction.isButton() && interaction.customId === 'close_ticket') {
+    const channel = interaction.channel;
+    const logChannel = interaction.guild.channels.cache.find(c => c.name === 'ticket-logs');
+
+    const messages = await channel.messages.fetch({ limit: 100 });
+    const transcript = messages.reverse().map(m => `[${m.author.tag}] ${m.content}`).join('\n');
+
+    if (logChannel) {
+      await logChannel.send({
+        files: [{ attachment: Buffer.from(transcript, 'utf-8'), name: `${channel.name}.txt` }]
+      });
+    }
+
+    await interaction.reply({ content: '🔒 Ticket zamknięty.', ephemeral: true });
+    setTimeout(() => channel.delete(), 3000);
+  }
+
+  // CHANGELOG MODAL
+  if (interaction.isButton() && interaction.customId === 'open_changelog_form') {
+    const modal = new ModalBuilder()
+      .setCustomId('changelog_modal')
+      .setTitle('Hounds.lol Changelog');
+
+    const title = new TextInputBuilder().setCustomId('title').setLabel('Tytuł').setStyle(TextInputStyle.Short).setRequired(true);
+    const added = new TextInputBuilder().setCustomId('added').setLabel('Co DODANO?').setStyle(TextInputStyle.Paragraph);
+    const fixed = new TextInputBuilder().setCustomId('fixed').setLabel('Co NAPRAWIONO?').setStyle(TextInputStyle.Paragraph);
+    const removed = new TextInputBuilder().setCustomId('removed').setLabel('Co USUNIĘTO?').setStyle(TextInputStyle.Paragraph);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(title),
+      new ActionRowBuilder().addComponents(added),
+      new ActionRowBuilder().addComponents(fixed),
+      new ActionRowBuilder().addComponents(removed)
+    );
+
+    return interaction.showModal(modal);
+  }
+
+  // SEND CHANGELOG
+  if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'changelog_modal') {
+    const title = interaction.fields.getTextInputValue('title');
+    const added = interaction.fields.getTextInputValue('added');
+    const fixed = interaction.fields.getTextInputValue('fixed');
+    const removed = interaction.fields.getTextInputValue('removed');
+
+    const embed = new EmbedBuilder()
+      .setTitle(`📝 ${title}`)
+      .setColor('#1e1e1e')
+      .setDescription(`
+${added ? `🟢 **Dodano:**\n${added}\n` : ''}
+${fixed ? `🟠 **Naprawiono:**\n${fixed}\n` : ''}
+${removed ? `🔴 **Usunięto:**\n${removed}\n` : ''}
+`)
+      .setImage('https://cdn.discordapp.com/attachments/1315741454437584916/1460033159755468842/3828650c-0ca4-430c-b033-9ab469eeb873-md.jpg')
+      .setFooter({ text: 'Hounds.lol • Stay Secure' })
+      .setTimestamp();
+
+    const channel = interaction.guild.channels.cache.find(c => c.name === 'changelog');
+    if (channel) await channel.send({ content: '@everyone', embeds: [embed] });
+
+    await interaction.reply({ content: '✅ Changelog wysłany!', ephemeral: true });
+    try { await interaction.message?.delete(); } catch {}
+  }
+
+  // =================== TEXT PANEL ===================
   if (interaction.isStringSelectMenu() && interaction.customId === 'ping_select') {
     const ping = interaction.values[0];
 
@@ -136,11 +235,9 @@ client.on('interactionCreate', async interaction => {
       .setRequired(true);
 
     modal.addComponents(new ActionRowBuilder().addComponents(textInput));
-
     return interaction.showModal(modal);
   }
 
-  // =================== SEND TEXT ===================
   if (interaction.type === InteractionType.ModalSubmit && interaction.customId.startsWith('text_modal_')) {
     const pingOption = interaction.customId.split('_')[2];
     const text = interaction.fields.getTextInputValue('text');
@@ -155,17 +252,11 @@ client.on('interactionCreate', async interaction => {
     });
 
     await interaction.reply({ content: '✅ Wysłano!', ephemeral: true });
-
-    try {
-      await interaction.message?.delete();
-    } catch {}
   }
-
-  // =================== RESZTA TWOJEGO KODU ===================
-  // (ticket, changelog itd. zostają bez zmian – Discord sam je obsłuży)
 });
 
 // TOKEN
 client.login(process.env.TOKEN);
 // LUB:
 // client.login("TWÓJ_DISCORD_TOKEN");
+
