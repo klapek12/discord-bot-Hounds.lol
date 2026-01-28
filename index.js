@@ -174,14 +174,29 @@ Opisz swój problem.`,
     return interaction.showModal(modal);
   }
 
-  // ===== TEXT MODAL =====
+  // ===== TEXT MODAL (PREMIUM EMBED) =====
   if (interaction.type === InteractionType.ModalSubmit && interaction.customId.startsWith('text_modal_')) {
     const text = interaction.fields.getTextInputValue('text');
     const ping = interaction.customId.includes('_true_');
     const panelId = interaction.customId.split('_').pop();
 
+    const embed = new EmbedBuilder()
+      .setColor('#808080')
+      .addFields({
+        name: '✨ Wiadomość',
+        value: `**${text}**`
+      })
+      .setFooter({
+        text: `𝓗𝓸𝓾𝓷𝓭𝓼.𝓵𝓸𝓵 • ${new Date().toLocaleDateString('pl-PL', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        })}`
+      });
+
     await interaction.channel.send({
-      content: `${ping ? '@everyone\n' : ''}${text}`
+      content: ping ? '@everyone' : null,
+      embeds: [embed]
     });
 
     try {
