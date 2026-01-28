@@ -93,8 +93,29 @@ client.on('messageCreate', async message => {
       .setDescription('Kliknij przycisk, aby dodać changelog.');
 
     await message.channel.send({ embeds: [embed], components: [row] });
-
     setTimeout(() => message.delete(), 2000);
+  }
+
+  // =================== !TEXT ===================
+  if (message.content === '!text') {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('text_ping_yes')
+        .setLabel('Ping: TAK')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('text_ping_no')
+        .setLabel('Ping: NIE')
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+    const panel = await message.channel.send({
+      content: 'Czy chcesz wysłać wiadomość z pingiem?',
+      components: [row]
+    });
+
+    client.textPanelData ??= new Map();
+    client.textPanelData.set(panel.id, message.id);
   }
 });
 
@@ -135,54 +156,54 @@ Opisz swój problem.`,
     return interaction.reply({ content: '✅ Ticket utworzony!', ephemeral: true });
   }
 
-  if (interaction.isButton() && interaction.customId === 'close_ticket') {
-    const channel = interaction.channel;
-    const logChannel = interaction.guild.channels.cache.find(c => c.name === 'ticket-logs');
+  // ===== TEXT BUTTONS =====
+  if (interaction.isButton() && interaction.customId.startsWith('text_ping_')) {
+    const ping = interaction.customId === 'text_ping_yes';
 
-    const messages = await channel.messages.fetch({ limit: 100 });
-    const transcript = messages
-      .reverse()
-      .map(m => `[${m.author.tag}] ${m.content}`)
-      .join('\n');
+    const modal = new ModalBuilder()
+      .setCustomId(`text_modal_${ping}_${interaction.message.id}`)
+      .setTitle('Wyślij wiadomość');
 
-    if (logChannel) {
-      await logChannel.send({
-        files: [{
-          attachment: Buffer.from(transcript, 'utf-8'),
-          name: `${channel.name}.txt`
-        }]
-      });
-    }
+    const input = new TextInputBuilder()
+      .setCustomId('text')
+      .setLabel('Treść wiadomości')
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(true);
 
-    await interaction.reply({ content: '🔒 Ticket zamknięty.', ephemeral: true });
-    setTimeout(() => channel.delete(), 3000);
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+    return interaction.showModal(modal);
   }
 
+  // ===== TEXT MODAL =====
+  if (interaction.type === InteractionType.ModalSubmit && interaction.customId.startsWith('text_modal_')) {
+    const text = interaction.fields.getTextInputValue('text');
+    const ping = interaction.customId.includes('_true_');
+    const panelId = interaction.customId.split('_').pop();
+
+    await interaction.channel.send({
+      content: `${ping ? '@everyone\n' : ''}${text}`
+    });
+
+    try {
+      const cmdId = client.textPanelData.get(panelId);
+      await interaction.channel.messages.fetch(panelId).then(m => m.delete());
+      await interaction.channel.messages.fetch(cmdId).then(m => m.delete());
+      client.textPanelData.delete(panelId);
+    } catch {}
+
+    return interaction.reply({ content: '✅ Wysłano', ephemeral: true });
+  }
+
+  // ===== CHANGELOG =====
   if (interaction.isButton() && interaction.customId === 'open_changelog_form') {
     const modal = new ModalBuilder()
       .setCustomId('changelog_modal')
       .setTitle('Hounds.lol Changelog');
 
-    const title = new TextInputBuilder()
-      .setCustomId('title')
-      .setLabel('Tytuł')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
-
-    const added = new TextInputBuilder()
-      .setCustomId('added')
-      .setLabel('Co DODANO? (🟢)')
-      .setStyle(TextInputStyle.Paragraph);
-
-    const fixed = new TextInputBuilder()
-      .setCustomId('fixed')
-      .setLabel('Co NAPRAWIONO? (🟠)')
-      .setStyle(TextInputStyle.Paragraph);
-
-    const removed = new TextInputBuilder()
-      .setCustomId('removed')
-      .setLabel('Co USUNIĘTO? (🔴)')
-      .setStyle(TextInputStyle.Paragraph);
+    const title = new TextInputBuilder().setCustomId('title').setLabel('Tytuł').setStyle(TextInputStyle.Short).setRequired(true);
+    const added = new TextInputBuilder().setCustomId('added').setLabel('Co DODANO?').setStyle(TextInputStyle.Paragraph);
+    const fixed = new TextInputBuilder().setCustomId('fixed').setLabel('Co NAPRAWIONO?').setStyle(TextInputStyle.Paragraph);
+    const removed = new TextInputBuilder().setCustomId('removed').setLabel('Co USUNIĘTO?').setStyle(TextInputStyle.Paragraph);
 
     modal.addComponents(
       new ActionRowBuilder().addComponents(title),
@@ -193,44 +214,8 @@ Opisz swój problem.`,
 
     return interaction.showModal(modal);
   }
-
-  if (interaction.type === InteractionType.ModalSubmit && interaction.customId === 'changelog_modal') {
-    const title = interaction.fields.getTextInputValue('title');
-    const added = interaction.fields.getTextInputValue('added');
-    const fixed = interaction.fields.getTextInputValue('fixed');
-    const removed = interaction.fields.getTextInputValue('removed');
-
-    const embed = new EmbedBuilder()
-      .setTitle(`📝 ${title}`)
-      .setColor('#1e1e1e')
-      .setDescription(`
-${added ? `🟢 **Dodano:**\n${added}\n` : ''}
-${fixed ? `🟠 **Naprawiono:**\n${fixed}\n` : ''}
-${removed ? `🔴 **Usunięto:**\n${removed}\n` : ''}
-`)
-      .setImage('https://cdn.discordapp.com/attachments/1315741454437584916/1460033159755468842/3828650c-0ca4-430c-b033-9ab469eeb873-md.jpg')
-      .setFooter({ text: 'Hounds.lol • Stay Secure' })
-      .setTimestamp();
-
-    const channel = interaction.guild.channels.cache.find(c => c.name === 'changelog');
-
-    if (channel) {
-      await channel.send({
-        content: '@everyone',
-        embeds: [embed]
-      });
-    }
-
-    await interaction.reply({ content: '✅ Changelog wysłany!', ephemeral: true });
-
-    try {
-      await interaction.message?.delete();
-    } catch {}
-  }
 });
 
 // TOKEN
 client.login(process.env.TOKEN);
-// LUB:
 // client.login("TWÓJ_DISCORD_TOKEN");
-
